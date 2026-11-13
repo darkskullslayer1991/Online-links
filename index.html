@@ -78,6 +78,17 @@ nav{position:fixed;top:0;width:100%;z-index:100;background:rgba(13,8,5,.72);back
 .thumb img{width:100%;height:100%;object-fit:cover;opacity:0;filter:sepia(12%) saturate(95%);transition:opacity .8s,transform 1s var(--ease),filter .5s}
 .thumb img.ready{opacity:1}
 .card:hover .thumb img{transform:scale(1.05);filter:none}
+
+/* ---------- Spoiler (click to reveal) ---------- */
+.thumb{position:relative}
+.card .thumb.spoiler img,.card:hover .thumb.spoiler img{filter:blur(30px) brightness(.55);transform:scale(1.2)}
+.thumb.spoiler{cursor:pointer}
+.veil{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(13,8,5,.8);border:1px solid var(--border);color:var(--text);font:600 12px var(--sans);letter-spacing:.1em;text-transform:uppercase;padding:8px 16px;border-radius:999px;pointer-events:none;transition:opacity .3s}
+.thumb:not(.spoiler) .veil{opacity:0}
+.card:hover .thumb.spoiler .veil{background:rgba(13,8,5,.95);color:var(--brass)}
+.stage img.spoiler{filter:blur(40px) brightness(.55);cursor:pointer}
+#lb-veil{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(13,8,5,.85);border:1px solid var(--border);color:var(--text);font:600 13px var(--sans);letter-spacing:.1em;text-transform:uppercase;padding:10px 20px;border-radius:999px;pointer-events:none}
+
 .info{padding:18px 20px 22px;display:flex;flex-direction:column;gap:10px;flex:1;background:
   radial-gradient(circle at 10px calc(100% - 10px),var(--brass-muted) 1.5px,transparent 2px),radial-gradient(circle at calc(100% - 10px) calc(100% - 10px),var(--brass-muted) 1.5px,transparent 2px)}
 .plate{align-self:flex-start;background:var(--metal);color:#1b110a;font:600 11px var(--sans);padding:2px 10px;border-radius:3px;box-shadow:0 1px 0 rgba(255,255,255,.2) inset,0 1px 4px rgba(0,0,0,.5)}
@@ -171,6 +182,7 @@ dialog[open]{animation:fade .5s var(--ease)}
     <div class="stage">
       <button class="round lb-nav prev" id="prev" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
       <img id="lb-img" alt="">
+      <span id="lb-veil" hidden>Spoiler · click to reveal</span>
       <button class="round lb-nav next" id="next" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
     </div>
   </div>
@@ -315,7 +327,8 @@ function buildCards() {
     img.loading = "lazy"; img.decoding = "async"; img.alt = f.name;
     img.onload = () => img.classList.add("ready");
     img.src = f.url;
-    thumb.append(img);
+    thumb.classList.add("spoiler");
+    thumb.append(img, el("span", "veil", "Spoiler"));
 
     const info = el("div", "info", `<span class="plate"></span><h3 class="name"></h3>
       <div class="actions"><button class="act" data-copy>${ICON.copy} Copy link</button>
@@ -340,12 +353,19 @@ function filter() {
   gallery.lastElementChild.hidden = view.length > 0;
 }
 
+function reveal(f) {
+  f.revealed = true;
+  f.el.querySelector(".thumb").classList.remove("spoiler");
+}
+
 function showAt(i) {
   if (!view.length) return;
   current = (i + view.length) % view.length;
   const f = view[current];
   lbImg.src = f.url;
   lbImg.alt = f.name;
+  lbImg.classList.toggle("spoiler", !f.revealed);
+  $("lb-veil").hidden = !!f.revealed;
   $("lb-title").textContent = f.name;
   $("lb-count").textContent = `${current + 1} of ${view.length}`;
 }
@@ -362,8 +382,18 @@ tabs.onclick = e => {
 gallery.onclick = e => {
   const card = e.target.closest(".card");
   if (!card) return;
-  if (e.target.closest("[data-copy]")) copyURL(card._f.path);
-  else if (e.target.closest(".thumb")) { showAt(view.indexOf(card._f)); lightbox.showModal(); }
+  const f = card._f;
+  if (e.target.closest("[data-copy]")) copyURL(f.path);
+  else if (e.target.closest(".thumb")) {
+    if (!f.revealed) { reveal(f); return; }   // first click: just unblur
+    showAt(view.indexOf(f));
+    lightbox.showModal();
+  }
+};
+
+lbImg.onclick = () => {
+  const f = view[current];
+  if (f && !f.revealed) { reveal(f); showAt(current); }
 };
 
 $("prev").onclick = () => showAt(current - 1);
